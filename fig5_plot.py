@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Nov  6 16:57:02 2024
-
-@author: skistiaqueahmed
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
@@ -143,13 +135,14 @@ def plot_clusters(ax, data_path, label):
     ax.set_xlabel('Longitude', fontsize=14, labelpad=20)
     ax.set_ylabel('Latitude', fontsize=14, labelpad=20)
 
-# Plot each cluster data
-plot_clusters(axs[0], '/Users/skistiaqueahmed/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Cluster analysis/Cluster_map/Without_ZA/Jaccard_new/Full_N_Final/Bucket_cluster_map_new.csv', '(a)')
-plot_clusters(axs[1], '/Users/skistiaqueahmed/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Cluster analysis/Cluster_map/Without_ZA/Jaccard_new/Full_N_Final/Intake_cluster_map_new.csv', '(b)')
-plot_clusters(axs[2], '/Users/skistiaqueahmed/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Cluster analysis/Cluster_map/Without_ZA/Jaccard_new/Full_N_Final/Niskin_cluster_map_new.csv', '(c)')
+# Plot each cluster data with method names in the subplot labels
+plot_clusters(axs[0], '/Users/skistiaqueahmed/Desktop/New_second_paper/Fig.5/Bucket_cluster_map_new.csv', '(a) Bucket')
+plot_clusters(axs[1], '/Users/skistiaqueahmed/Desktop/New_second_paper/Fig.5/Intake_cluster_map_new.csv', '(b) Intake')
+plot_clusters(axs[2], '/Users/skistiaqueahmed/Desktop/New_second_paper/Fig.5/Niskin_cluster_map_new.csv', '(c) Niskin')
+
 
 # Adjust layout and save the figure
 plt.tight_layout()
-plt.savefig('/Users/skistiaqueahmed/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Cluster analysis/Cluster_map/Without_ZA/Jaccard_new/Full_N_Final/Joint_figure/Combined_cluster_map3.png', format='png', dpi=600, bbox_inches='tight')
+plt.savefig('/Users/skistiaqueahmed/Desktop/New_second_paper/Fig.5/Fig.5.png', format='png', dpi=600, bbox_inches='tight')
 
 plt.show()
