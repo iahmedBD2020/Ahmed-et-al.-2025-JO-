@@ -1,125 +1,165 @@
-# Load required libraries
-library(indicspecies)
-library(openxlsx)
-library(writexl)
+# Load necessary libraries
 library(dplyr)
 library(tidyr)
+library(ggplot2)
+library(reshape2)
+library(RColorBrewer)
+library(openxlsx)
 
-# Load the data
-file_path <- "~/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Heat_map_by-clusters/Cluster5_cluster2_comparison/heatmap_5_2.xlsx"
-data <- read.xlsx(file_path)
+# Load the data from CSV (preserving column names with spaces)
+file_path <- "~/Desktop/New_second_paper/Fig.7/heatmap_newest.csv"
+data <- read.csv(file_path, check.names = FALSE)
+print(colnames(data)[1:10])  # Confirm column names
 
-# Convert species data to presence/absence (1 for present, 0 for absent)
-species_data <- as.data.frame(ifelse(data[, -1] > 0, 1, 0))
-
-# Extract the cluster information
-clusters <- data$Cluster
+# Exclude 'Zacco platypus' column if it exists
+data <- data %>% select(-contains("Zacco platypus"))
 
 # Exclude '5_I_N' from the cluster data
 valid_data <- data[data$Cluster != "5_I_N", ]
-species_data_valid <- species_data[data$Cluster != "5_I_N", ]
-clusters_valid <- valid_data$Cluster
 
-# Step 1: Aggregate the data by cluster to get species frequency
+# Transform to presence/absence (1/0)
+valid_data[, -1] <- as.data.frame(lapply(valid_data[, -1], function(x) ifelse(x > 0, 1, 0)))
+
+# Aggregate data by clusters
 agg_data <- valid_data %>%
   group_by(Cluster) %>%
   summarise(across(everything(), sum))
 
-# Step 2: Get the top 10 species for each cluster
+# Shorten species names to a maximum of 35 characters
+colnames(agg_data)[-1] <- sapply(colnames(agg_data)[-1], function(x) {
+  if(nchar(x) > 35) substring(x, 1, 35) else x
+})
+
+# Get the top 10 species for each cluster
 top_species_per_cluster <- agg_data %>%
   gather(key = "Species", value = "Frequency", -Cluster) %>%
   group_by(Cluster) %>%
   top_n(10, Frequency) %>%
-  ungroup() %>%  # Make sure the result is a data frame and not a grouped tibble
-  select(Species, Cluster, Frequency)  # Keep the necessary columns for further operations
+  pull(Species) %>%
+  unique()
 
-# Step 3: Run indicator species analysis for the top 10 species in each cluster
-top_species_data <- species_data_valid[, top_species_per_cluster$Species]
+# Create the "Others" column only for species not in top 10
+agg_data <- agg_data %>%
+  mutate(Others = rowSums(select(., -c(Cluster, all_of(top_species_per_cluster))) > 0))
 
-# Perform indicator species analysis
-result <- multipatt(top_species_data, clusters_valid, func = "IndVal.g", duleg = FALSE)
+# Select only the top species and the "Others" column
+agg_data <- agg_data %>%
+  select(Cluster, all_of(top_species_per_cluster), Others)
 
-# Extract the summary of the indicator species analysis
-result_summary <- result$sign
+# Ensure "Others" is last in species order
+species_order <- c(setdiff(top_species_per_cluster, "Others"), "Others")
 
-# Add rownames (species names) to the result dataframe
-result_summary$Indicator_Species <- rownames(result_summary)
+# Melt data for heatmap
+melted_data <- melt(agg_data, id.vars = "Cluster")
 
-# Convert the p-values to numeric
-result_summary$P_value <- as.numeric(result_summary$p.value)
+# Apply same truncation and factor ordering
+melted_data$variable <- factor(substr(melted_data$variable, 1, 35),
+                               levels = substr(species_order, 1, 35))
 
-# Create a cluster column based on the maximum value in the s. columns
-result_summary$Cluster <- apply(result_summary[, grep("^s\\.", colnames(result_summary))], 1, function(row) {
-  colnames(result_summary)[grep("^s\\.", colnames(result_summary))][which.max(row)]
-})
+# Define breaks and labels
+breaks <- c(0, 1, 10, 25, 40, 60, 100, 200)
+labels <- c("0", "1-10", "11-25", "26-40", "41-60", "61-100", "101-200")
 
-# Step 4: Sort the result based on p-value and R-value
-top_indicator_species <- result_summary %>%
-  filter(P_value < 0.05) %>%  # Select significant species
-  arrange(P_value, desc(stat)) %>%  # Sort by p-value and R-value
-  group_by(Cluster)  # Group by cluster
+# Bin the frequency values
+melted_data$value_bin <- cut(melted_data$value, breaks = breaks, labels = labels, right = FALSE)
 
-# Step 5: Identify unique or fallback species among the top 10 species in each cluster
-unique_species_results <- list()
+# Define color palette
+colors <- rev(brewer.pal(length(labels), "RdYlBu"))
+
+# Plot the heatmap
+heatmap_plot <- ggplot(melted_data, aes(x = variable, y = as.factor(Cluster), fill = value_bin)) +
+  geom_tile() +
+  scale_fill_manual(
+    values = setNames(colors, labels),
+    name = "Frequency",
+    labels = labels,
+    limits = labels,
+    drop = FALSE
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+    axis.text.x = element_text(angle = 90, hjust = 1, face = "italic", vjust = 0.5),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.title.y = element_text(size = 16, face = "bold")
+  ) +
+  labs(x = "Species", y = "Cluster")
+
+# Print the heatmap
+print(heatmap_plot)
+
+# Save the plot
+ggsave("~/Desktop/New_second_paper/Fig.7/Fig.7.png", plot = heatmap_plot, width = 12, height = 8, dpi = 600)
+
+# Identify unique/nearly unique and dominant species
+results <- list()
+dominant_species_results <- list()
 
 for(cluster in unique(agg_data$Cluster)) {
   
-  # Species present in the current cluster among the top 10 detected species
-  species_in_cluster <- top_species_per_cluster %>%
+  species_in_cluster <- agg_data %>%
     filter(Cluster == cluster) %>%
+    select(-Cluster, -Others) %>%
+    pivot_longer(cols = everything(), names_to = "Species", values_to = "Frequency") %>%
+    filter(Frequency > 0) %>%
+    arrange(desc(Frequency)) %>%
     pull(Species)
   
-  # Check if these species are found in other clusters
-  species_in_other_clusters <- top_species_per_cluster %>%
-    filter(Cluster != cluster & Species %in% species_in_cluster) %>%
+  unique_species_per_cluster <- agg_data %>%
+    pivot_longer(cols = -c(Cluster, Others), names_to = "Species", values_to = "Frequency") %>%
+    group_by(Species) %>%
+    summarise(Cluster_Count = sum(Frequency > 0)) %>%
+    filter(Cluster_Count <= 2) %>%
     pull(Species)
   
-  # Unique species (those not found in other clusters)
-  unique_species <- setdiff(species_in_cluster, species_in_other_clusters)
+  cluster_unique_species <- intersect(species_in_cluster, unique_species_per_cluster)
   
-  if(length(unique_species) > 0) {
-    # If unique species are found, use them
-    unique_species_results[[cluster]] <- unique_species
+  dominant_species <- agg_data %>%
+    filter(Cluster == cluster) %>%
+    select(-Cluster, -Others) %>%
+    pivot_longer(cols = everything(), names_to = "Species", values_to = "Frequency") %>%
+    arrange(desc(Frequency)) %>%
+    slice(1:3) %>%
+    pull(Species)
+  
+  if(length(cluster_unique_species) > 0) {
+    results[[cluster]] <- data.frame(
+      Cluster = cluster,
+      Type = "Unique/Nearly Unique",
+      Species = paste(cluster_unique_species, collapse = ", ")
+    )
   } else {
-    # If no unique species, select species found in only one other cluster
-    fallback_species <- top_species_per_cluster %>%
-      filter(Species %in% species_in_cluster) %>%
-      group_by(Species) %>%
-      summarise(Cluster_Count = n()) %>%
-      filter(Cluster_Count == 2) %>%
-      pull(Species)
-    
-    unique_species_results[[cluster]] <- fallback_species
+    results[[cluster]] <- data.frame(
+      Cluster = cluster,
+      Type = "Dominant",
+      Species = paste(dominant_species, collapse = ", ")
+    )
   }
+  
+  dominant_species_results[[cluster]] <- data.frame(
+    Cluster = cluster,
+    Dominant_Species = paste(dominant_species, collapse = ", ")
+  )
 }
 
-# Step 6: Run indicator species analysis on the unique/fallback species
-species_data_unique <- species_data_valid[, unlist(unique_species_results)]
+# Combine results
+final_results <- do.call(rbind, results)
+dominant_species_df <- do.call(rbind, dominant_species_results)
 
-# Perform the indicator species analysis for unique/fallback species
-result_unique <- multipatt(species_data_unique, clusters_valid, func = "IndVal.g", duleg = FALSE)
-
-# Extract the summary of the unique/fallback species indicator analysis
-result_unique_summary <- result_unique$sign
-
-# Add rownames (species names) to the unique species result dataframe
-result_unique_summary$Indicator_Species <- rownames(result_unique_summary)
-
-# Convert the p-values to numeric
-result_unique_summary$P_value <- as.numeric(result_unique_summary$p.value)
-
-# Create a cluster column for the unique species
-result_unique_summary$Cluster <- apply(result_unique_summary[, grep("^s\\.", colnames(result_unique_summary))], 1, function(row) {
-  colnames(result_unique_summary)[grep("^s\\.", colnames(result_unique_summary))][which.max(row)]
+# Truncate long species names in output
+final_results$Species <- sapply(strsplit(final_results$Species, ", "), function(x) {
+  paste(substr(x, 1, 35), collapse = ", ")
+})
+dominant_species_df$Dominant_Species <- sapply(strsplit(dominant_species_df$Dominant_Species, ", "), function(x) {
+  paste(substr(x, 1, 35), collapse = ", ")
 })
 
-# Step 7: Save the final results to an Excel file
-output_file <- "~/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Heat_map_by-clusters/Indicator_species/top_and_unique_species_indicator_analysis_all2.xlsx"
-write_xlsx(list(
-  "Top Indicator Species Analysis" = top_indicator_species,
-  "Unique Species Indicator Analysis" = result_unique_summary
-), output_file)
+# Save Excel with 2 sheets
+output_path <- "~/Desktop/New_second_paper/Fig.7/cluster_analysis_results_top10.xlsx"
+write.xlsx(list(
+  "Unique or Nearly Unique Species" = final_results,
+  "Top 3 Dominant Species" = dominant_species_df
+), output_path, rowNames = FALSE)
 
-# Aggregated species frequency counts for Cluster 5
-agg_cluster_5 <- agg_data %>% filter(Cluster == "s.5")
-print(agg_cluster_5)  # Check the species and their frequencies in Cluster 5
+cat("Results have been saved to:", output_path, "\n")
