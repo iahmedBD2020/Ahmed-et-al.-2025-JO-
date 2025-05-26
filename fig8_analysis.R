@@ -7,7 +7,7 @@ library(writexl)
 library(dplyr)
 
 # Read the OTU table CSV file
-otu_table <- read.csv("~/Desktop/2nd_paper_codes/Fig. 8/NMDS_83_by_cluster_new_ZP.csv", header = TRUE)
+otu_table <- read.csv("~/Desktop/New_second_paper/Fig.8/NMDS_83_by_cluster_new_ZP.csv", header = TRUE)
 
 # Remove the "Zacco platypus" column
 otu_table <- otu_table[, !names(otu_table) %in% "Zacco platypus"]
@@ -147,7 +147,7 @@ nmds_plot <- nmds_plot +
 
 # Save the NMDS plot
 ggsave(
-  filename = "~/Desktop/2nd_paper_codes/Fig. 8/Fig 8.png",
+  filename = "~/Desktop/New_second_paper/Fig.8/Fig 8.png",
   plot = nmds_plot,
   width = 7,
   height = 7,
@@ -174,4 +174,4 @@ results_list <- list(
 )
 
 # Save all results to an Excel file
-write_xlsx(results_list, "~/Desktop/2nd_paper_codes/Fig. 8/statistical_results.xlsx")
+write_xlsx(results_list, "~/Desktop/New_second_paper/Fig.8/statistical_results.xlsx")
