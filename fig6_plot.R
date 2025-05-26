@@ -8,7 +8,7 @@ library(writexl)  # For writing to Excel files
 library(cowplot)  # For combining plots with a shared legend
 
 # Load your data
-data <- read.csv("~/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Cluster_biodiversity/Final_without_ZA/Cluster_bio_ZA.csv")
+data <- read.csv("~/Desktop/New_second_paper/Fig.6/Cluster_bio_ZA_final.csv")
 
 # Prepare the data: Exclude 'Zacco.platypus' column and convert species columns to abundance data
 species_data <- data %>%
@@ -87,7 +87,7 @@ for (cluster in unique(combined_index_data$Cluster)) {
 }
 
 # Save the Wilcoxon test results to an Excel file
-write_xlsx(wilcox_results, "~/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Cluster_biodiversity/Final_without_ZA/wilcox_results_all_ZA.xlsx")
+write_xlsx(wilcox_results, "~/Desktop/New_second_paper/Fig.6/wilcox_results_all_ZA.xlsx")
 
 # Define updated colors for each method
 color_mapping <- c("Bucket" = "dodgerblue", "Intake" = "violetred1", "Niskin" = "darkgreen")
@@ -148,5 +148,5 @@ combined_plot <- plot_grid(
 final_plot <- plot_grid(combined_plot, legend, ncol = 2, rel_widths = c(3, 0.4))
 
 # Save and display the final combined plot with a shared legend
-ggsave("~/Desktop/My Desktop/Latest Academic/Surface+Tap/New analysis/All_data_KH-23-2_included/Cluster_biodiversity/Final_without_ZA/Shannon_simpson_system_annotation_ZA.png", plot = final_plot, dpi = 600, bg = "white", width = 16, height = 12)
+ggsave("~/Desktop/New_second_paper/Fig.6/Shannon_simpson_system_annotation_ZA.png", plot = final_plot, dpi = 600, bg = "white", width = 16, height = 12)
 print(final_plot)
